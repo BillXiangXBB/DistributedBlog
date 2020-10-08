@@ -3,7 +3,7 @@
 Kubernetes是一个可移植的、可扩展的开源平台，用于管理容器化的工作负载和服务，可促进声明式配置和自动化。Kubernetes拥有一个庞大且快速增长的生态系统。Kubernetes的服务、支持和工具广泛可用。
 
 Kubernetes的架构如下图所示：  
-![Kubernetes架构](/images/kubernetes/00-Kubenetes架构.jpg)
+![Kubernetes架构](../../../images/kubernetes/00-KubernetesStructure.jpg)
 
 通过上图可看出，Kubernetes主要包含以下几个重要的核心组件：
 * apiserver：主节点上负责提供Kubernetes API服务的组件，提供了资源操作的唯一入口，并提供认证、授权、访问控制、API注册和发现等机制；
