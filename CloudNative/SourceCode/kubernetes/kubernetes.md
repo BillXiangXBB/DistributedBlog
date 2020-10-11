@@ -11,7 +11,7 @@ Kubernetes的架构如下图所示：
 * scheduler：负责资源的调度，按照预定的调度策略将pod调度到相应的机器上；
 * etcd：保存整个集群的状态；
 * kubelet：负责维护容器的生命周期，同时也负责Volume（CVI）和网络（CNI）的管理；
-* kebu-proxy：负责为Service提供cluster内部的服务发现和负载均衡；
+* kube-proxy：负责为Service提供cluster内部的服务发现和负载均衡；
 * Container runtime：负责镜像管理以及pod和容器的真正运行（CRI）。
 
 除了核心组件外，还有一些推荐的Add-ons：
