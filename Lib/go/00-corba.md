@@ -1,7 +1,7 @@
 # corba
 
 ## corba简介
-corba是一个可用来创建强大的CLI命令行命令的库；
+corba是spf13提供的一个可用来创建强大的CLI命令行命令的库；
 corba也是一个应用程序，它将生成应用程序脚手架以快速开发基于corba的应用程序。
 corba主要提供以下功能：
 * 简单的基于子命令的CLI，如app server，app fetch等
@@ -83,6 +83,144 @@ Commands代表操作，corba定义了Command数据结构来表示一条命令。
 * errWriter：io.Writer，用户定义的错误输出用于代替stderr
 
 ### Arguments（参数）
-Args表示操作的对象或操作的条件
+Args表示操作的对象或操作的条件，corba在Command中用args数组来保存所有入参，使用ValidArgs或ValidArgsFunction来进行参数校验。
+另外，corba在Command中定义了Args来规范化、标准化入参。Args是一个类型为PersitionalArgs的函数，其标准定义为：func(cmd *Command, args []string) error.
+corba定义了如下几个标准化函数：
+* func legacyArgs(cmd *Command, args []string) error：该函数有三种处理方式：
+    * 没有子命令的根命令可以接受任意参数
+    * 带有子命令的根命令将执行子命令的有效性校验
+    * 子命令接受任意参数
+* func NoArgs(cmd *Command, args []string) error：如果输入参数则返回错误
+* func OnlyValidArgs(cmd *Command, args []string) error：如果包含了不存在与ValidArgs中的参数则返回错误
+* func ArbitraryArgs(cmd *Command, args []string) error：可输入任意参数
+* func MinimumNArgs(n int) PositionalArgs：可输入的最少参数数量为n
+* func MaximumNArgs(n int) PositionalArgs：可输入的最大参数数量为n
+* func ExactArgs(n int) PositionalArgs：可输入的参数数量为n
+* func ExactValidArgs(n int) PositionalArgs：ValidArgs中包含的参数数量为n
+* func RangeArgs(min int, max int) PositionalArgs：输入的参数数量在{min, max}之间
+
 ### Flags（标志）
-Flags是这些操作的修饰符
+Flags是这些操作的修饰符，标志通过另一个库pflag进行解析和管理。pflag同样是由spf13提供的公共库。
+其定义了Flag类型用于表示每一个标志：
+* Name：string，标签的名称
+* Shorthand：string，标签名称的字母缩写
+* Usage：string，用法
+* Value：Value，标签的值
+* DefValue：string，标签的默认值，用于用法消息显示
+* Changed：bool，如果用户设置了值（或使用默认值）时，设置为true
+* NoOptDefVal：string，标签的默认值，如果该标志在命令行中没有任何选项
+* Deprecated：string，如果该标志已废弃，则设置该字段用于提醒新的或现在用的标志
+* Hidden：bool，允许设置为true的标志在帮助或用法中不显示
+* ShorthandDeprecated：string，如果该标志的缩写被废弃，则使用该字段用于提醒新的或现在用的标志
+* Annotations：map[string][]string，用于bash自动补全代码
+
+Flag的Value是一个接口，其包含三个方法：
+* String() string：Value值
+* Set(string) error：设置Value值
+* Type() string：Value值的类型
+
+另外，pflag也定义了FlagSet来表示一组标志。
+
+## 用法
+创建Command
+```go
+var rootCmd = &cobra.Command{
+  Use:   "demo",
+  Short: "Demo is a very fast static site generator",
+  Long: `A Fast and Flexible Static Site Generator built with
+                love by spf13 and friends in Go.
+                Complete documentation is available at http://hugo.spf13.com`,
+  Run: func(cmd *cobra.Command, args []string) {
+    // Do Stuff Here
+  },
+}
+
+func Execute() {
+  if err := rootCmd.Execute(); err != nil {
+    fmt.Fprintln(os.Stderr, err)
+    os.Exit(1)
+  }
+}
+```
+如果需要子命令，添加子命令
+```go
+func init() {
+  rootCmd.AddCommand(versionCmd)
+}
+
+var versionCmd = &cobra.Command{
+  Use:   "version",
+  Short: "Print the version number of Hugo",
+  Long:  `All software has versions. This is Hugo's`,
+  Run: func(cmd *cobra.Command, args []string) {
+    fmt.Println("Hugo Static Site Generator v0.9 -- HEAD")
+  },
+}
+```
+初始化命令参数和标志
+```go
+func init() {
+	cobra.OnInitialize(initConfig)
+
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.cobra.yaml)")
+	rootCmd.PersistentFlags().StringP("author", "a", "YOUR NAME", "author name for copyright attribution")
+	rootCmd.PersistentFlags().StringVarP(&userLicense, "license", "l", "", "name of license for the project")
+	rootCmd.PersistentFlags().Bool("viper", true, "use Viper for configuration")
+	viper.BindPFlag("author", rootCmd.PersistentFlags().Lookup("author"))
+	viper.BindPFlag("useViper", rootCmd.PersistentFlags().Lookup("viper"))
+	viper.SetDefault("author", "NAME HERE <EMAIL ADDRESS>")
+	viper.SetDefault("license", "apache")
+
+	rootCmd.AddCommand(addCmd)
+	rootCmd.AddCommand(initCmd)
+}
+
+func er(msg interface{}) {
+	fmt.Println("Error:", msg)
+	os.Exit(1)
+}
+
+func initConfig() {
+	if cfgFile != "" {
+		// Use config file from the flag.
+		viper.SetConfigFile(cfgFile)
+	} else {
+		// Find home directory.
+		home, err := homedir.Dir()
+		if err != nil {
+			er(err)
+		}
+
+		// Search config in home directory with name ".cobra" (without extension).
+		viper.AddConfigPath(home)
+		viper.SetConfigName(".cobra")
+	}
+
+	viper.AutomaticEnv()
+
+	if err := viper.ReadInConfig(); err == nil {
+		fmt.Println("Using config file:", viper.ConfigFileUsed())
+	}
+}
+```
+执行命令
+```go
+import (
+  "{pathToYourApp}/cmd"
+)
+
+func main() {
+  cmd.Execute()
+}
+```
+
+## 命令执行流程
+执行命令调用Command对象的Execute()方法，其执行步骤如下：
+1. 调用ParseFlags()方法解析参数和标志
+2. 执行preRun()方法进行一些初始化
+3. 调用ValidateArgs()方法校验参数和标志
+4. 如果定义了PersistentPreRun或PersistentPreRunE方法，则执行该方法；如果存在父节点，且父节点定义了PersistentPreRun或PersistentPreRunE方法，则继续执行父节点的方法
+5. 如果定义了PreRun或PreRunE方法，则执行该方法
+6. 指定Run或RunE方法
+7. 如果定义了PostRun或PostRunE方法，则执行该方法
+8. 如果定义了PersistentPostRun或PersistentPostRun方法，则执行该方法；如果存在父节点，且父节点定义了PersistentPostRun或PersistentPostRunE方法，则继续执行父节点的方法
